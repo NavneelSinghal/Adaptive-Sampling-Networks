@@ -18,6 +18,7 @@ The core idea is to train a small, efficient "sampler" model that takes the raw 
   * **Reinforcement learning**: Setting up rewards for such metrics (diversity, coherence, factuality, subjective quality and so on) can be looked into, with standard loss functions (and not direct logit-matching as done for the above methods). Penalties like KL divergence with some older checkpoint might help stabilize training.
   * **Multi-layer inputs**: This can be augmented with tuned-lens or similar decoding methods applied on hidden states from intermediate layers. There is research that suggests that this can improve robustness (for instance, decoding by contrasting layers improves factuality in language models).
   * **Context-based inputs**: By training a lightweight permutation-invariant recurrent model or another approach of this sort, we could try implementing architectures that can express (and learn) stateful algorithms like Mirostat, keeping in mind that metrics over the whole context give us more information that can be used to better pick the next token.
+  * **Interpretability**: Understanding what kinds of functions the model learns, and whether we can, reliably and across models, reproduce part of the performance gains, if any, through a simpler algorithmic sampling strategy.
 
 ## How It Works
 
