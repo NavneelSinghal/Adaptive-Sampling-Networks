@@ -46,6 +46,10 @@ With the generated dataset (or any other dataset with the same format), the `tra
 The loss is defined as:
 $$\mathcal{L} = D_{KL}(P_{\text{target}} || P_{\text{pred}}) + \gamma \sum_{i \in \text{truncated}} P_{\text{pred}, i}$$
 
+### 3\. Further Training
+
+Please see `Planned Features` for details on TODOs for further training.
+
 ## Model Architectures
 
 There are three different sampler architectures of increasing complexity.
