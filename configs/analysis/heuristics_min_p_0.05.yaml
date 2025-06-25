@@ -1,0 +1,6 @@
+name: "min_p"
+weight: 1
+processors:
+  - name: "min_p"
+    params:
+      min_p: 0.05
