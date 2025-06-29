@@ -131,12 +131,23 @@ class LinearAttention(nn.Module):
     Implements Linear Attention with elu(x) + 1 as the feature map.
     Non-causal linear attention is used in order to deal with large vocabularies.
     """
-    def __init__(self, d_model: int, dtype: torch.dtype):
+    def __init__(self, d_model: int, n_heads: int, dtype: torch.dtype):
         super().__init__()
+        if d_model % n_heads != 0:
+            raise ValueError(f"d_model = {d_model} is not divisible by n_heads = {n_heads}")
         self.dtype = dtype
         self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_head = d_model // n_heads
+        self.o_proj = nn.Linear(d_model, d_model, bias=True, dtype=dtype)
 
     def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+        batch_size, seq_len, _ = q.shape
+
+        q = q.view(batch_size, seq_len, self.n_heads, self.d_head).transpose(1, 2)
+        k = k.view(batch_size, seq_len, self.n_heads, self.d_head).transpose(1, 2)
+        v = v.view(batch_size, seq_len, self.n_heads, self.d_head).transpose(1, 2)
+
         q_prime = F.elu(q) + 1
         k_prime = F.elu(k) + 1
 
@@ -146,17 +157,20 @@ class LinearAttention(nn.Module):
         k_sum = k_prime.sum(dim=-2, keepdim=True)
         denominator = torch.matmul(q_prime, k_sum.transpose(-2, -1))
 
-        return numerator / (denominator + torch.tensor(1e-6, dtype=self.dtype))
+        out = numerator / (denominator + torch.tensor(1e-6, dtype=self.dtype))
+        out = out.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)
+
+        return self.o_proj(out)
 
 class Block(nn.Module):
     """
     A Transformer-style block using Linear Attention.
     """
-    def __init__(self, d_model: int, d_ff: int, dtype: torch.dtype):
+    def __init__(self, d_model: int, d_ff: int, n_heads: int, dtype: torch.dtype):
         super().__init__()
         self.dtype = dtype
         self.qkv_proj = nn.Linear(d_model, 3 * d_model, dtype=dtype)
-        self.attention = LinearAttention(d_model, dtype=dtype)
+        self.attention = LinearAttention(d_model, n_heads, dtype=dtype)
         self.ffn = SwiGLUMLP(in_features=d_model, hidden_features=d_ff, out_features=d_model, bias=True, dtype=dtype)
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
@@ -180,12 +194,12 @@ class SamplingNetwork(nn.Module):
     This architecture is permutation-equivariant in order to not learn any knowledge
     about specific tokens, but to learn how to transform the probability distribution itself.
     """
-    def __init__(self, d_model: int, d_ff: int, num_blocks: int, dtype: torch.dtype):
+    def __init__(self, d_model: int, d_ff: int, n_blocks: int, n_heads: int, dtype: torch.dtype):
         super().__init__()
         self.dtype = dtype
         self.d_model = d_model
         self.encoder = ElementwiseEncoder(d_model, dtype=dtype)
-        self.blocks = nn.Sequential(*[Block(d_model, d_ff, dtype=dtype) for _ in range(num_blocks)])
+        self.blocks = nn.Sequential(*[Block(d_model, d_ff, n_heads, dtype=dtype) for _ in range(n_blocks)])
         self.transformation_head = SwiGLUMLP(in_features=d_model * 2, hidden_features=d_model, out_features=1, bias=True, dtype=dtype)
         self.truncation_head = SwiGLUMLP(in_features=d_model, hidden_features=d_model // 2, out_features=2, bias=True, dtype=dtype)
 
