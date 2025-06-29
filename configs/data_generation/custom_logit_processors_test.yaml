@@ -1,0 +1,45 @@
+sampling_pipelines:
+  - name: "Test Typical Sampling"
+    weight: 1.0
+    processors:
+      - name: "typical"
+        params:
+          mass: 0.9
+          min_tokens_to_keep: 2
+
+  - name: "Test Min-P Sampling"
+    weight: 1.0
+    processors:
+      - name: "min_p"
+        params:
+          min_p: 0.05
+          min_tokens_to_keep: 1
+
+  - name: "Test Epsilon Sampling"
+    weight: 1.0
+    processors:
+      - name: "epsilon"
+        params:
+          epsilon: 0.02
+          min_tokens_to_keep: 1
+
+  - name: "Test Eta Sampling"
+    weight: 1.0
+    processors:
+      - name: "eta"
+        params:
+          epsilon: 0.0003 # A common value for eta's epsilon
+          min_tokens_to_keep: 1
+      - name: "temperature" # You can still combine native params
+        params:
+          temperature: 0.8
+
+  - name: "Standard Top-P (for comparison)"
+    weight: 1.0
+    processors:
+      - name: "top_p"
+        params:
+          top_p: 0.92
+      - name: "temperature"
+        params:
+          temperature: 0.9
