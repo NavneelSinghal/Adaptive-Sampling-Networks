@@ -108,7 +108,8 @@ Defines the architecture of the sampler you want to train.
 # For SamplingNetwork
 d_model: 32
 d_ff: 64
-num_blocks: 4
+n_blocks: 4
+n_heads: 4
 
 # For SimpleDistributionAwareTransform
 # hidden_dims: 64
