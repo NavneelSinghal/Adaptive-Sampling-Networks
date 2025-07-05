@@ -4,8 +4,10 @@
 # for generating rollouts with custom logit processors.
 
 python -m sglang.launch_server \
-  --model-path google/gemma-3-1b-it \
+  --model-path /mnt/data/llms/Gemma3-4B-it \
   --host "localhost" \
   --port 30000 \
   --tp-size 2 \
-  --enable-custom-logit-processor
+  --enable-custom-logit-processor \
+  --disable-custom-all-reduce \
+  --mem-fraction-static 0.3

@@ -1,0 +1,7 @@
+sampling_pipelines:
+  - name: "Test Greedy"
+    weight: 1.0
+    processors:
+      - name: "top_k"
+        params:
+          top_k: 1

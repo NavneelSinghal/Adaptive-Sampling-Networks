@@ -167,10 +167,10 @@ python src/generate_data.py \
 
 ### Step 3: Train the Sampler Model
 
-Use `train_supervised_schedule_acc.py` to train your chosen sampler model on the data you just generated.
+Use `train_supervised.py` to train your chosen sampler model on the data you just generated.
 
 ```bash
-python src/train_supervised_schedule_acc.py \
+python src/train_supervised.py \
   --model_name_or_path "model-name" \
   --sampler_model_name "SamplingNetwork" \
   --sampler_config_path "configs/sampler_models/<config>.yaml" \
