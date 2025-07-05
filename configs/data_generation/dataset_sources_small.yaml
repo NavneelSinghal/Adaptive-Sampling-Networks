@@ -1,0 +1,32 @@
+datasets:
+  - name: "writing_prompts"
+    path: "data/writing_prompts_small.jsonl"
+    prompt_key: "prompt"
+    incidence_vector:
+      check_factual: false
+      check_ifeval_or_math_or_gsm8k: false
+      check_diversity: true
+
+  - name: "if_math"
+    path: "data/if_math_small.jsonl"
+    prompt_key: "prompt"
+    incidence_vector:
+      check_factual: false
+      check_ifeval_or_math_or_gsm8k: true
+      check_diversity: false
+
+  - name: "factuality"
+    path: "data/factuality_small.jsonl"
+    prompt_key: "prompt"
+    incidence_vector:
+      check_factual: true
+      check_ifeval_or_math_or_gsm8k: false
+      check_diversity: false
+
+  - name: "chat"
+    path: "data/chat_small.jsonl"
+    prompt_key: "prompt"
+    incidence_vector:
+      check_factual: false
+      check_ifeval_or_math_or_gsm8k: false
+      check_diversity: false

@@ -10,4 +10,5 @@ python -m sglang.launch_server \
   --tp-size 2 \
   --enable-custom-logit-processor \
   --disable-custom-all-reduce \
-  --mem-fraction-static 0.3
+  --mem-fraction-static 0.3 \
+  --random-seed 0

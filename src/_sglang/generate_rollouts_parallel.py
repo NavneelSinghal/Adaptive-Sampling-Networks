@@ -8,7 +8,7 @@ from collections import defaultdict
 import concurrent.futures
 from typing import List, Tuple, Dict, Any
 
-from .sglang_pipeline_processor import PipelineLogitsProcessor
+from src._sglang.sglang_pipeline_processor import PipelineLogitsProcessor
 
 from transformers import AutoTokenizer
 

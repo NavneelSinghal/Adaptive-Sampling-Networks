@@ -1,1 +1,3 @@
 samplenv/
+data/*.jsonl
+**/__pycache__/
