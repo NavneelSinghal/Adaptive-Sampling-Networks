@@ -1,4 +1,4 @@
-python src/train_supervised_schedule_acc.py \
+python src/train_supervised.py \
     --model_name_or_path <path-to-model> \
     --sampler_model_name SamplingNetwork \
     --sampler_config_path config/sn_config.yaml \

@@ -1,0 +1,14 @@
+data_path: "path/to/pre_generated_data.jsonl"
+output_path: "path/to/data_with_ratings.jsonl"
+
+prompt_key: "prompt"
+generation_key: "generation"
+heuristic_key: "sampler_info"
+
+reward_model_backend: "hf" # choose "hf" for transformers or "sglang"
+
+hf_model_name_or_path: "NiuTrans/GRAM-LLaMA3.2-3B-RewardModel"
+# sglang_url: "http://localhost:30000/generate"
+
+# Total rounds will be log2(num_players) + tournament_extra_rounds
+tournament_extra_rounds: 3
