@@ -2,9 +2,9 @@ import yaml
 from copy import deepcopy
 
 def generate_sampling_pipelines():
-    temperatures = [0.3, 0.5, 0.8, 1.0, 1.25, 1.5]
-    top_p_values = [0.9, 0.92, 0.95, 0.98]
-    top_k_values = [16, 32, 64, 128]
+    temperatures = [round(1.2 ** x * 10) / 10 for x in range(-6, 6)]
+    top_p_values = [0.5, 0.8, 0.9, 0.95, 0.98]
+    top_k_values = [8, 16, 32, 64, 128]
     min_p_values = [0.01, 0.02, 0.05, 0.1]
     eta_values = [1e-3, 8e-4, 5e-4, 2e-4, 1e-4]
     epsilon_values = [4e-3, 2e-3, 1e-3, 8e-4, 5e-4, 2e-4]
@@ -30,8 +30,7 @@ def generate_sampling_pipelines():
                 f"official temp {temp}",
                 [
                     deepcopy(temp_processor),
-                    {"name": "top_p", "params": {"top_p": 0.95}},
-                    {"name": "top_k", "params": {"top_k": 64}},
+                    {"name": "top_p", "params": {"top_p": 0.9}},
                 ],
             )
         )
@@ -91,7 +90,7 @@ def generate_sampling_pipelines():
 if __name__ == "__main__":
     config_data = generate_sampling_pipelines()
     
-    output_filename = "generated_config.yaml"
+    output_filename = "generated_config_llama3.2_3b.yaml"
     
     with open(output_filename, "w") as f:
         yaml.dump(config_data, f, indent=2, sort_keys=False)
