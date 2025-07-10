@@ -52,6 +52,8 @@ class HFRewardScorer(BaseRewardScorer):
             device_map=device
         )
         self.device = self.model.device
+
+        # Pre-tokenize the target choices "A" and "B"
         target_choices = ["A", "B"]
         self._target_token_ids = torch.tensor(
             [self.tokenizer(item, add_special_tokens=False).input_ids for item in target_choices],

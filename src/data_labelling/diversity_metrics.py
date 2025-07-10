@@ -17,14 +17,20 @@ def calculate_self_bleu(generations: List[str]) -> float:
     """
     if len(generations) < 2:
         return 0.0
+
     total_bleu_score = 0.0
     bleu = BLEU(effective_order=True)
+
     for i in range(len(generations)):
         hypothesis = generations[i]
         references = generations[:i] + generations[i+1:]
+        
+        # sacrebleu expects references to be in a list of lists format
         formatted_references = [references]
+        
         score = bleu.sentence_score(hypothesis, formatted_references)
         total_bleu_score += score.score
+
     return total_bleu_score / len(generations)
 
 def calculate_embedding_entropy(

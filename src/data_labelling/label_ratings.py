@@ -16,6 +16,7 @@ class SwissTournamentRunner:
     def __init__(self, player_ids: List[str]):
         if not player_ids or len(player_ids) < 2:
             raise ValueError("Player IDs must contain at least two unique items.")
+        
         self.players = {pid: {"id": pid, "score": 0.0, "opponents": set()} for pid in player_ids}
         self.comparison_history = []
 
@@ -25,9 +26,11 @@ class SwissTournamentRunner:
             shuffled_ids = list(self.players.keys())
             random.shuffle(shuffled_ids)
             return [(shuffled_ids[i], shuffled_ids[i+1]) for i in range(0, len(shuffled_ids) -1, 2)]
+
         sorted_players = sorted(self.players.values(), key=lambda p: p['score'], reverse=True)
         to_be_paired = [p['id'] for p in sorted_players]
         pairs = []
+
         while len(to_be_paired) >= 2:
             p1_id = to_be_paired.pop(0)
             best_opponent_idx = -1
@@ -35,12 +38,14 @@ class SwissTournamentRunner:
                 if p2_id not in self.players[p1_id]['opponents']:
                     best_opponent_idx = i
                     break
+            
             if best_opponent_idx != -1:
                 p2_id = to_be_paired.pop(best_opponent_idx)
                 pairs.append((p1_id, p2_id))
             elif to_be_paired:
                 p2_id = to_be_paired.pop(0)
                 pairs.append((p1_id, p2_id))
+        
         return pairs
 
     def run_round(self, round_num: int, scorer, prompt: str, generation_map: Dict[str, str]):
