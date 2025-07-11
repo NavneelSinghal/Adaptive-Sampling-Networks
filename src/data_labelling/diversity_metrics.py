@@ -24,9 +24,7 @@ def calculate_self_bleu(generations: List[str]) -> float:
     for i in range(len(generations)):
         hypothesis = generations[i]
         references = generations[:i] + generations[i+1:]
-        
-        # sacrebleu expects references to be in a list of lists format
-        formatted_references = [references]
+        formatted_references = references
         
         score = bleu.sentence_score(hypothesis, formatted_references)
         total_bleu_score += score.score
@@ -54,6 +52,8 @@ def calculate_embedding_entropy(
     embeddings = model.encode(generations, convert_to_numpy=True)
     similarity_matrix = cosine_similarity(embeddings)
     eigenvalues = np.linalg.eigvalsh(similarity_matrix)
-    non_zero_eigenvalues = eigenvalues[eigenvalues > 1e-9] 
+    non_zero_eigenvalues = eigenvalues[eigenvalues > 1e-9]
+    sum_of_eigenvalues = np.sum(non_zero_eigenvalues)
+    non_zero_eigenvalues /= sum_of_eigenvalues
     entropy = -np.sum(non_zero_eigenvalues * np.log2(non_zero_eigenvalues))
     return entropy

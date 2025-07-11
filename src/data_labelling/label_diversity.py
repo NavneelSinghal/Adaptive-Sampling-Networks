@@ -35,8 +35,8 @@ def label_diversity(data_path: str, output_path: str, reference_seed: int):
                 self_bleu = calculate_self_bleu(generations)
                 embedding_entropy = calculate_embedding_entropy(generations, embedding_model)
                 reference_datapoint['diversity'] = {
-                    'self_bleu': self_bleu,
-                    'embedding_entropy': embedding_entropy,
+                    'self_bleu': float(self_bleu),
+                    'embedding_entropy': float(embedding_entropy),
                     'sample_count': len(generations)
                 }
                 f_out.write(json.dumps(reference_datapoint) + '\n')

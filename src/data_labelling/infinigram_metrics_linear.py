@@ -77,21 +77,13 @@ class InfiniGramApiLabeller:
             # Find the longest matching n-gram starting at position i
             # TODO: Check whether this or a simple left-to-right search amortizes better.
             longest_match_len = 0
-            low = 1
-            high = min(self.max_n, num_tokens - i)
-
-            while low <= high:
-                n = low + (high - low) // 2
-                if n == 0:
-                    break
-
+            for n in range(self.max_n, 0, -1):
+                if i + n > num_tokens:
+                    continue
                 ngram_to_check = tokens[i : i + n]
                 if self._check_ngram_exists(ngram_to_check):
                     longest_match_len = n
-                    low = n + 1
-                else:
-                    high = n - 1
-
+                    break
             if longest_match_len > 0: # TODO: Can also look at distribution of this value.
                 total_overlap += longest_match_len
                 i += longest_match_len
