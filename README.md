@@ -160,7 +160,7 @@ After generating and labeling data, you can train your sampler model. You may wa
 python src/train_supervised.py \
   --model_name_or_path "path/to/your/model" \
   --sampler_model_name "SamplingNetwork" \
-  --sampler_config_path "configs/sampler_models/model_config.yaml" \
+  --sampler_config_path "configs/sampler_models/model_config_scale.yaml" \
   --data_path "./path/to/your/filtered_labelled_data.jsonl" \
   --output_dir "./sampler_checkpoints" \
   --max_seq_length 1000 \
