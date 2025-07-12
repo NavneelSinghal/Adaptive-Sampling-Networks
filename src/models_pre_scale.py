@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 class SwiGLUMLP(nn.Module):
     def __init__(self, in_features: int, hidden_features: int, out_features: int, bias: bool, dtype: torch.dtype):
@@ -180,12 +181,6 @@ class Block(nn.Module):
         x = self.norm2(x + self.ffn(x))
         return x
 
-class Id(nn.Module):
-    def __init__(self):
-        super().__init__()
-    def forward(self, x: torch.Tensor):
-        return torch.tensor([[1.0]], device=x.device, dtype=x.dtype)
-
 class SamplingNetwork(nn.Module):
     """
     An adaptive sampler using a Transformer-like architecture with Linear Attention
@@ -203,14 +198,15 @@ class SamplingNetwork(nn.Module):
         super().__init__()
         self.dtype = dtype
         self.d_model = d_model
+        scale_init = torch.tensor(math.log(math.exp(1) - 1), dtype=dtype)
+        if scale:
+            self.scale = nn.Parameter(scale_init)
+        else:
+            self.scale = scale_init
         self.encoder = ElementwiseEncoder(d_model, dtype=dtype)
         self.blocks = nn.Sequential(*[Block(d_model, d_ff, n_heads, dtype=dtype) for _ in range(n_blocks)])
         self.transformation_head = SwiGLUMLP(in_features=d_model * 2, hidden_features=d_model, out_features=1, bias=True, dtype=dtype)
         self.truncation_head = SwiGLUMLP(in_features=d_model, hidden_features=d_model // 2, out_features=2, bias=True, dtype=dtype)
-        if scale:
-            self.scaling_head = SwiGLUMLP(in_features=d_model, hidden_features=d_model // 2, out_features=1, bias=True, dtype=dtype)
-        else:
-            self.scaling_head = Id()
 
     def forward(self, logits: torch.Tensor):
         original_dtype = logits.dtype
@@ -218,7 +214,7 @@ class SamplingNetwork(nn.Module):
         original_shape = logits.shape
         V = original_shape[-1]
         
-        log_probs_flat = F.log_softmax(logits.view(-1, V), dim=-1)
+        log_probs_flat = F.log_softmax(logits.view(-1, V) * F.softplus(self.scale), dim=-1)
         
         h0 = self.encoder(log_probs_flat)
         h_final = self.blocks(h0)
@@ -227,8 +223,7 @@ class SamplingNetwork(nn.Module):
         c_broadcast = c.unsqueeze(1).expand(-1, V, self.d_model)
         
         l_prime_mod = self.transformation_head(torch.cat([h_final, c_broadcast], dim=-1)).squeeze(-1)
-        multiplier = F.softplus(self.scaling_head(c.unsqueeze(1))).squeeze(1)
-        l_prime = multiplier * (log_probs_flat + l_prime_mod)
+        l_prime = log_probs_flat + l_prime_mod
         
         truncation_params = self.truncation_head(c)
         scale = F.softplus(truncation_params[..., 0:1])

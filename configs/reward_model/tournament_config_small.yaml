@@ -1,5 +1,5 @@
-data_path: "/mnt/data/diversity_labelled_data.jsonl"
-output_path: "/mnt/data/quality_and_diversity_labelled_data.jsonl"
+data_path: "/mnt/data/combined_small.jsonl"
+output_path: "/mnt/data/quality_labelled_combined_small.jsonl"
 
 prompt_key: "prompt"
 generation_key: "generation"
