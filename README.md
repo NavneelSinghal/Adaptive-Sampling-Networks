@@ -7,14 +7,14 @@ The core idea is to train a small, efficient "sampler" model that takes the raw 
 ## Key Features
 
   * **Learned Sampling**: Moves beyond hand-tuned heuristics to a learnable algorithm for sampling.
-  * **Reasonable Efficiency**: The sampler models are designed to be small and fast, adding minimal overhead (< 1ms) to the generation process.
+  * **Reasonable Efficiency**: The sampler models are designed to be small and fast, adding minimal overhead (\< 1ms) to the generation process.
   * **Permutation-Equivariant by Design**: The models treat the vocabulary as an unordered set, ensuring they learn general distribution transformations rather than memorizing token-specific information.
-  * **End-to-End Training**: The samplers are (currently) trained via supervised learning to mimic the output of complex sampling pipelines. See **Planned Features** for more.
+  * **Data Curation**: Features a pipeline for generating candidate texts and labeling them for quality, diversity, and similarity to datasets to create high-quality training data.
+  * **Supervised Training**: The samplers are trained via supervised learning to mimic the output distributions of complex, high-quality sampling pipelines.
   * **Analysis Tools**: Includes scripts to visualize and compare the learned sampler's output distribution against the original and target distributions.
 
 ## Planned Features
 
-  * **Rejection sampling to combine the best of existing sampling strategies**: Learning to mimic multiple algorithms after rejection sampling based on reward models/other metrics. Reranking steps with the sets of high-quality heuristics can be applied to improve metrics like diversity by reranking, score-mixing, or up/down-sampling different sampling algorithms.
   * **Reinforcement learning**: Setting up rewards for such metrics (diversity, coherence, factuality, subjective quality and so on) can be looked into, with standard loss functions (and not direct logit-matching as done for the above methods). Penalties like KL divergence with some older checkpoint might help stabilize training.
   * **Multi-layer inputs**: This can be augmented with tuned-lens or similar decoding methods applied on hidden states from intermediate layers. There is research that suggests that this can improve robustness (for instance, decoding by contrasting layers improves factuality in language models).
   * **Context-based inputs**: By training a lightweight permutation-invariant recurrent model or another approach of this sort, we could try implementing architectures that can express (and learn) stateful algorithms like Mirostat, keeping in mind that metrics over the whole context give us more information that can be used to better pick the next token.
@@ -24,22 +24,31 @@ The core idea is to train a small, efficient "sampler" model that takes the raw 
 
 The project aims to create a self-contained, efficient, and expressive neural network which takes raw logits from a base language model and produces a modified set of logits suitable for sampling. The network internally learns to apply all transformations, including value-based modifications and dynamic soft truncation, without requiring external scaffolding like hard cutoffs.
 
-### 1\. Data Generation
+The current workflow involves generating a diverse set of candidate responses, scoring and ranking them to identify the best-performing sampling strategies, and then training the sampler network to mimic those strategies.
 
-The training process starts by creating a dataset of recipes used to generate `(raw_logits, target_logits)` pairs at training time.
+### 1\. Candidate Generation
 
-1.  A large set of prompts is prepared.
-2.  The `generate_data.py` script feeds these prompts to a frozen base LLM.
-3.  For each generation, a random sampling pipeline (e.g., a combination of top-k, top-p and temperature) is chosen from a configuration file.
-4.  The script saves the prompt, the text generated using this random heuristic, and the configuration of the heuristic used.
+Instead of a simple data generation script, the repository uses a parallelized pipeline to generate a large set of candidate responses.
 
-This can be used as the first step for data generation pipelines for multiple training algorithms as mentioned earlier.
+1.  A high-throughput `SGLang` server is launched to serve the base LLM. Multiple servers can be run in parallel for even greater throughput.
+2.  The `src/rejection_sampling/generate_candidates_multi.py` script reads prompts from various source datasets (defined in `configs/data_generation/dataset_sources.yaml`).
+3.  For each prompt, it generates multiple responses, each using a different sampling heuristic from a broad configuration file (e.g., `configs/data_generation/generated_config_llama3.2_3b.yaml`).
+4.  This process creates a rich dataset where each prompt is associated with dozens of generations, each tagged with the specific heuristic used.
 
-### 2\. Supervised Training
+### 2\. Data Annotation & Labeling
 
-With the generated dataset (or any other dataset with the same format), the `train_supervised.py` script trains the sampler model.
+Once candidates are generated, they are annotated with objective scores to identify the highest-quality outputs. This is a crucial step for creating the "target" data for the sampler model.
 
-1.  For each sample in the dataset, the script replays (in parallel) the generation for all tokens to get the base model's raw logits at each step.
+1.  **Quality Ranking**: The `src/data_labelling/label_ratings.py` script uses a reward model (e.g., `GRAM-LLaMA3.2-3B-RewardModel`) to conduct a Swiss-style tournament for the generations associated with each prompt. It then uses a Bradley-Terry model to calculate a latent quality rating for each generation. This effectively ranks the different sampling heuristics for a given prompt.
+2.  **Diversity Scoring**: `src/data_labelling/efficient_diversity.py` calculates `self-BLEU` and `embedding_entropy` scores to measure the diversity of generations produced by each heuristic.
+3.  **Data Matching**: `src/data_labelling/label_infinigram.py` uses the Infini-gram API to check for n-gram overlap with a large reference corpus, to match the quality of generations with
+    that of high-quality datasets.
+
+### 3\. Supervised Training
+
+With the annotated dataset, the `train_supervised.py` script trains the sampler model. The data can be filtered to only include generations from the top-ranked heuristics.
+
+1.  For each sample in the dataset, the script replays the generation to get the base model's raw logits at each step.
 2.  It then applies the saved heuristic pipeline to these raw logits to compute the "target" logits. The target logits are typically sparse, with many values set to `-inf` where tokens have been filtered out.
 3.  The sampler model takes the raw logits and produces its own "predicted" logits.
 4.  The goal is to make the predicted logits match the target logits. This is achieved by minimizing a custom `TruncatedLogitsLoss` function, which has two components:
@@ -49,17 +58,13 @@ With the generated dataset (or any other dataset with the same format), the `tra
 The loss is defined as:
 $$\mathcal{L} = D_{KL}(P_{\text{target}} || P_{\text{pred}}) + \gamma \sum_{i \in \text{truncated}} P_{\text{pred}, i}$$
 
-### 3\. Further Training
-
-Please see `Planned Features` for details on TODOs for further training.
-
 ## Model Architectures
 
-There are three different sampler architectures of increasing complexity.
+There are three different sampler architectures of increasing complexity defined in `src/models.py`.
 
 1.  **`LocalProbabilityTransform`**:
 
-  * **Description**: The simplest model. It applies a learned transformation to each log-probability value independently using a small MLP (`SwiGLUMLP`). It also learns a soft truncation gate.
+  * **Description**: The simplest model. It applies a learned transformation to each log-probability value independently using a small MLP. It also learns a soft truncation gate.
   * **Can Learn**: Simple transformations like temperature scaling, epsilon sampling, and polynomial functions of the log-probabilities.
 
 2.  **`SimpleDistributionAwareTransform`**:
@@ -76,136 +81,112 @@ There are three different sampler architectures of increasing complexity.
 
 ```
 .
-├── src/                        # Directory for code
-│   ├── analyze.py              # Script to analyze and compare a trained sampler with basic sampling.
-│   ├── generate_data.py        # Script to generate training data using heuristics.
-│   ├── train_supervised.py     # Main training script for the sampler models.
-│   ├── models.py               # Contains definitions for the three sampler model architectures.
-│   ├── loss.py                 # Defines the custom TruncatedLogitsLoss.
-│   └── sampling_heuristics.py  # Utilities to build and apply sampling pipelines.
-├── configs/                    # Directory for configuration files.
-│   ├── sampler_models/         # Configs for the sampler models' architectures.
-│   │   └── *.yaml
-│   ├── data_generation/        # Configs defining the heuristics for data generation.
-│   │   └── *.yaml
-│   └── analysis/               # Configs defining the target pipeline for analysis.
-│       └── *.yaml
-└── README.md
+├── src/
+│   ├── _sglang/                          # SGLang server integration and custom processors.
+│   │   ├── generate_rollouts_parallel.py # Client for parallel generation.
+│   │   └── run_sglang_server*.sh         # Scripts to launch SGLang servers.
+│   ├── rejection_sampling/               # Advanced candidate generation pipeline.
+│   │   ├── generate_candidates_multi.py  # Main script for generating candidates in parallel.
+│   │   └── run_on_multiple_servers.sh    # Script to launch multiple servers across GPUs.
+│   ├── data_labelling/                   # Scripts for annotating generated data.
+│   │   ├── label_ratings.py              # Ranks generations using a reward model tournament.
+│   │   ├── efficient_diversity.py        # Labels for self-BLEU and embedding entropy.
+│   │   └── label_infinigram.py           # Labels for data-matching using Infini-gram API.
+│   ├── analyze.py                        # Script to analyze and compare a trained sampler.
+│   ├── generate_data.py                  # (Legacy) Simple script to generate training data.
+│   ├── train_supervised.py               # Main training script for the sampler models.
+│   ├── models.py                         # Definitions for the sampler model architectures.
+│   ├── loss.py                           # The custom TruncatedLogitsLoss.
+│   └── sampling_heuristics.py            # Utilities to build and apply sampling pipelines.
+├── configs/
+│   ├── data_generation/                  # Configs defining heuristics and data sources.
+│   ├── reward_model/                     # Configs for the reward model-based tournament.
+│   └── sampler_models/                   # Configs for the sampler models' architectures.
+└── requirements.txt
 ```
 
 ## Usage
 
-The process involves three main steps: data generation, model training, and analysis. For more detailed information on usage, run each script with `--help`.
+The process involves generating candidates, labeling them for quality, and then training a sampler model on the best-resulting data.
 
-### Step 1: Prepare Configuration Files
+### Workflow 1: Advanced Data Generation & Labeling
 
-You will need to create several YAML configuration files. See the `configs/` directory for examples.
+This workflow creates the high-quality dataset needed for training.
 
-**Sampler Model Config (`configs/sampler_models/SamplingNetwork.yaml`)**:
-Defines the architecture of the sampler you want to train.
+**Step 1: Launch SGLang Server(s)**
 
-```yaml
-# For SamplingNetwork
-d_model: 32
-d_ff: 64
-n_blocks: 4
-n_heads: 4
-
-# For SimpleDistributionAwareTransform
-# hidden_dims: 64
-# use_dynamic_truncation: true
-```
-
-**Data Generation Heuristics Config (`configs/data_generation/default_heuristics.yaml`)**:
-Defines the different sampling pipelines that will be randomly chosen during data generation. Would generally be used with a single sampling pipeline, though.
-
-```yaml
-sampling_pipelines:
-  - name: "Conservative Top-P"
-    weight: 1.0
-    processors:
-      - name: "top_p"
-        params:
-          top_p: 0.92
-      - name: "temperature"
-        params:
-          temperature: 0.9
-
-  - name: "Min-P"
-    weight: 0.8
-    processors:
-      - name: "min_p"
-        params:
-          min_p: 0.05
-
-  - name: "Aggressive Top-K"
-    weight: 1.0
-    processors:
-      - name: "top_k"
-        params:
-          top_k: 10
-```
-
-### Step 2: Generate Training Data
-
-Use `generate_data.py` to create a dataset for training. You need a `.jsonl` file where each line is a JSON object with a key for the prompt text (e.g., `{"prompt": "Write a story about a dragon."}`).
-
-This step is optional and can be skipped if it is not important that the generations are done using the sampler that is specified. In this case, ensure that your data format is the same as if it were
-generated by this script, for the later steps.
+First, launch one or more SGLang servers to serve the base LLM. You can launch one server per GPU for maximum throughput. Modify the `model-path` in the script. Note that something similar can be
+achieved via `sglang_router` as well.
 
 ```bash
-python src/generate_data.py \
-  --model_name_or_path "model-name" \
-  --heuristics_config_path "configs/data_generation/<config>.yaml" \
-  --source_data_path "path/to/your/prompts.jsonl" \
-  --output_path "./generated_training_data.jsonl" \
-  --num_samples 1000 \
-  --batch_size 8 \
-  --min_new_tokens 50 \
-  --max_new_tokens 250
+# To launch 8 servers, one for each GPU from 0 to 7
+bash src/rejection_sampling/run_on_multiple_servers.sh
 ```
 
-### Step 3: Train the Sampler Model
+**Step 2: Generate Candidate Responses**
 
-Use `train_supervised.py` to train your chosen sampler model on the data you just generated.
+In a separate terminal, run the candidate generation script. This will connect to the running SGLang servers and generate responses for every prompt using every heuristic specified.
+
+  * `dataset_sources_config_path`: A YAML file listing the input prompt datasets (see `configs/data_generation/dataset_sources.yaml`).
+  * `heuristics_config_path`: A YAML file listing all sampling pipelines to use (see `configs/data_generation/generate_yaml_*.py` for examples).
+
+```bash
+python src/rejection_sampling/generate_candidates_multi.py \
+    --model_path "path/to/your/model" \
+    --dataset_sources_config_path "configs/data_generation/dataset_sources.yaml" \
+    --heuristics_config_path "configs/data_generation/generated_config_llama3.2_3b.yaml" \
+    --output_path "./candidate_generations.jsonl" \
+    --num_servers 8 \
+    --max_workers 32 \
+    --max_new_tokens 250
+```
+
+**Step 3: Label Data for Quality (Tournament)**
+
+Run the tournament script to score the generated candidates using a reward model. This adds a `bradley_terry_rating` to each datapoint.
+
+  * `--config`: Path to the tournament configuration YAML, which specifies the data paths and reward model details (see `configs/reward_model/tournament_config.yaml`).
+
+```bash
+python src/data_labelling/label_ratings.py \
+    --config configs/reward_model/tournament_config.yaml
+```
+
+### Workflow 2: Train the Sampler Model
+
+After generating and labeling data, you can train your sampler model. You may want to first filter your labeled `.jsonl` file to only include generations with high `bradley_terry_rating`.
 
 ```bash
 python src/train_supervised.py \
-  --model_name_or_path "model-name" \
+  --model_name_or_path "path/to/your/model" \
   --sampler_model_name "SamplingNetwork" \
-  --sampler_config_path "configs/sampler_models/<config>.yaml" \
-  --data_path "./generated_training_data.jsonl" \
+  --sampler_config_path "configs/sampler_models/model_config.yaml" \
+  --data_path "./path/to/your/filtered_labelled_data.jsonl" \
   --output_dir "./sampler_checkpoints" \
   --max_seq_length 1000 \
-  --token_batch_size 8 \
+  --token_batch_size 12 \
   --learning_rate 1e-2 \
   --num_epochs 1 \
   --save_steps 50 \
   --loss_gamma 5.0 \
   --lr_scheduler_type "cosine" \
-  --num_warmup_steps 100
-  --gradient_accumulation_steps 24 \
+  --num_warmup_steps 100 \
+  --gradient_accumulation_steps 16
 ```
 
 *Note: The script is configured to use two GPUs (`cuda:0` and `cuda:1`). You may need to adjust the `device` and `device2` variables in the script's `main` function for your specific hardware setup.*
 
-### Step 4: Analyze the Trained Sampler
+### Workflow 3: Analyze the Trained Sampler
 
-Use `analyze.py` to see how well your trained sampler performs. This script will generate a text continuation and then, for each new token, it will compare the probability distributions of:
-
-1.  The generation model's raw logits.
-2.  A target heuristic (e.g., top\_k = 50).
-3.  Your trained sampler.
-
-It will print metrics (KL Divergence, Truncated Probability Mass) and save plots for visual comparison.
+Use `analyze.py` to compare your trained sampler's output distribution against the base model's raw logits and a target heuristic pipeline.
 
 ```bash
-python analyze.py \
-  --model_name_or_path "model-name" \
+python src/analyze.py \
+  --model_name_or_path "path/to/your/model" \
   --sampler_model_name "SamplingNetwork" \
-  --sampler_config_path "configs/sampler_models/<config>.yaml" \
+  --sampler_config_path "configs/sampler_models/model_config.yaml" \
   --sampler_checkpoint_path "./sampler_checkpoints/final_model/sampler_model.bin" \
-  --pipeline_config_path "configs/analysis/<config>.yaml" \
+  --pipeline_config_path "configs/analysis/heuristics_min_p_0.05.yaml" \
   --prompt "Write me a random story." \
   --num_tokens_to_analyze 20 \
   --top_k_plot 100
