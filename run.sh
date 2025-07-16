@@ -9,7 +9,7 @@ python src/train_supervised.py \
     --learning_rate 1e-2 \
     --num_epochs 1 \
     --save_steps 50 \
-    --loss_gamma 5 \
+    --loss_gamma 1 \
     --lr_scheduler_type cosine \
     --num_warmup_steps 100 \
     --gradient_accumulation_steps 16 \
