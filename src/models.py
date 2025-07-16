@@ -171,8 +171,8 @@ class Block(nn.Module):
         self.qkv_proj = nn.Linear(d_model, 3 * d_model, dtype=dtype)
         self.attention = LinearAttention(d_model, n_heads, dtype=dtype)
         self.ffn = SwiGLUMLP(in_features=d_model, hidden_features=d_ff, out_features=d_model, bias=True, dtype=dtype)
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
+        self.norm1 = nn.LayerNorm(d_model, dtype=dtype)
+        self.norm2 = nn.LayerNorm(d_model, dtype=dtype)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         q, k, v = self.qkv_proj(x).chunk(3, dim=-1)
