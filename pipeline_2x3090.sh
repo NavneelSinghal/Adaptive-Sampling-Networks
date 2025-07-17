@@ -92,7 +92,7 @@ cat ${SEED_FILES} > "${ALL_GENERATIONS_FILE}"
 rm ${SEED_FILES}
 
 echo "Verifying combined file..."
-python src.verify_datagen_and_transform \
+python -m src.verify_datagen_and_transform \
     --input-path "${ALL_GENERATIONS_FILE}" \
     --output-path "${VERIFIED_DATA_FILE}" \
     --heuristics-config-path "${HEURISTICS_CONFIG_FILE}" \
