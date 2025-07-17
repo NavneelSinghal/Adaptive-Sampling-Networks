@@ -40,8 +40,6 @@ def calculate_embedding_entropy(generations: List[str], model) -> float:
     entropy = -np.sum(normalized_eigenvalues * np.log2(normalized_eigenvalues))
     return entropy
 
-# --- Worker Initialization & Processing Logic ---
-
 embedding_model = None
 
 def init_worker(num_gpus_available: int):
@@ -74,8 +72,6 @@ def process_group(datapoints: List[Dict], reference_seed: int) -> str | None:
             'sample_count': len(generations)
         }
     return '\n'.join([json.dumps(dp) for dp in datapoints])
-
-# --- Main Orchestration Function ---
 
 def label_diversity_parallel(data_path: str, output_path: str, reference_seed: int, num_gpus: int):
     print(f"Reading and grouping data from {data_path}...")
