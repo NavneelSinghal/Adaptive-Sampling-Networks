@@ -226,13 +226,13 @@ python src/train_supervised.py \
   --output_dir "./sampler_checkpoints" \
   --max_seq_length 1000 \
   --token_batch_size 12 \
-  --learning_rate 1e-2 \
+  --learning_rate 1e-3 \
   --num_epochs 1 \
   --save_steps 50 \
-  --loss_gamma 5.0 \
+  --loss_gamma 1.0 \
   --lr_scheduler_type "cosine" \
   --num_warmup_steps 100 \
-  --gradient_accumulation_steps 16
+  --gradient_accumulation_steps 2
 ```
 
 *Note: The script is configured to use two GPUs (`cuda:0` and `cuda:1`). You may need to adjust the `device` and `device2` variables in the script's `main` function for your specific hardware setup.*
