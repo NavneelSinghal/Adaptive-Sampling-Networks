@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+# NOTE: try with a smaller data source before using a bigger one
 # PLEASE CONFIGURE THE VARIABLES IN THE SECTION BELOW BEFORE RUNNING.
 # TODO: MUST BE EDITED BY USER
 export BASE_MODEL_PATH="/mnt/data/llms/Llama-3.2-3B-Instruct"
