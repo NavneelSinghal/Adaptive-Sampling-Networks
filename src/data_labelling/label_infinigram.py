@@ -2,7 +2,7 @@ import argparse
 import json
 from tqdm import tqdm
 
-from infinigram_metrics import InfiniGramApiLabeller
+from src.data_labelling.infinigram_metrics import InfiniGramApiLabeller
 
 def label_infinigram(data_path: str, output_path: str, index_name: str):
     """

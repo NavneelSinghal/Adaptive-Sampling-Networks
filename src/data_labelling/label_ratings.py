@@ -8,7 +8,7 @@ from collections import defaultdict
 from tqdm import tqdm
 from typing import List, Dict
 
-from reward_model_scorer import get_scorer
+from src.data_labelling.reward_model_scorer import get_scorer
 
 class SwissTournamentRunner:
     """

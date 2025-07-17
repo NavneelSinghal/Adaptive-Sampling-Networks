@@ -1,4 +1,5 @@
 import yaml
+import argparse
 from copy import deepcopy
 
 def generate_sampling_pipelines():
@@ -30,8 +31,7 @@ def generate_sampling_pipelines():
                 f"official temp {temp}",
                 [
                     deepcopy(temp_processor),
-                    {"name": "top_p", "params": {"top_p": 0.8}},
-                    {"name": "top_k", "params": {"top_k": 20}},
+                    {"name": "top_p", "params": {"top_p": 0.9}},
                 ],
             )
         )
@@ -89,14 +89,37 @@ def generate_sampling_pipelines():
     return final_config
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate a YAML configuration for sampling pipelines.")
+    parser.add_argument(
+        "--add_from_file",
+        type=str,
+        default=None,
+        help="Optional: Path to a YAML file with additional sampling pipelines to include."
+    )
+    args = parser.parse_args()
+
     config_data = generate_sampling_pipelines()
     
-    output_filename = "generated_config_qwen2.5_3b.yaml"
+    if args.add_from_file:
+        print(f"INFO: Attempting to add pipelines from '{args.add_from_file}'...")
+        try:
+            with open(args.add_from_file, 'r') as f:
+                additional_config = yaml.safe_load(f)
+                additional_pipelines = additional_config.get("sampling_pipelines", [])
+                if additional_pipelines:
+                    config_data["sampling_pipelines"].extend(additional_pipelines)
+                    print(f"Successfully added {len(additional_pipelines)} pipelines from file.")
+                else:
+                    print(f"WARNING: No 'sampling_pipelines' key found in '{args.add_from_file}'.")
+        except FileNotFoundError:
+            print(f"ERROR: File not found: '{args.add_from_file}'. Skipping.")
+        except yaml.YAMLError as e:
+            print(f"ERROR: Could not parse YAML from '{args.add_from_file}': {e}. Skipping.")
+
+    output_filename = "generated_config_llama3.2_3b.yaml"
     
     with open(output_filename, "w") as f:
         yaml.dump(config_data, f, indent=2, sort_keys=False)
         
     print(f"Successfully generated {len(config_data['sampling_pipelines'])} sampling pipelines.")
     print(f"Configuration saved to '{output_filename}'")
-
-

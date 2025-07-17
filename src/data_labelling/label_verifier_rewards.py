@@ -3,7 +3,7 @@ import json
 from tqdm import tqdm
 import logging
 
-from verifiers import GSM8KVerifier, MathVerifier, IFEvalVerifierOld
+from src.data_labelling.verifiers import GSM8KVerifier, MathVerifier, IFEvalVerifierOld
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

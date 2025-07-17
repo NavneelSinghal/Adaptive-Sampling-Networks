@@ -4,13 +4,10 @@ import yaml
 import requests
 from tqdm import tqdm
 import concurrent.futures
-from typing import List, Tuple, Dict, Any, Optional
-from functools import partial
+from typing import Tuple, Dict, Any, Optional
 
 from transformers import AutoTokenizer
 
-import sys
-import os
 from itertools import cycle
 from src._sglang.generate_rollouts_parallel import prepare_and_send_request as send_sglang_request
 
