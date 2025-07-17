@@ -12,6 +12,7 @@ def process_and_score_data(
     b_coeffs: list[float],
     c_coeffs: list[float],
     top_k: int,
+    sort_key: str,
 ):
     print("Reading data and grouping by prompt")
     data_by_prompt_seed = defaultdict(list)
@@ -79,9 +80,8 @@ def process_and_score_data(
             processed_generations.append(dp)
         if not processed_generations:
             continue
-        default_sort_key = f"a0.1_b0.9_c0.9"
         processed_generations.sort(
-            key=lambda x: x['combined_scores'].get(default_sort_key, -999),
+            key=lambda x: x['combined_scores'].get(sort_key, -999),
             reverse=True
         )
         top_generations = processed_generations[:top_k]
@@ -115,6 +115,7 @@ def main():
         b_coeffs=B_COEFFS,
         c_coeffs=C_COEFFS,
         top_k=args.top_k,
+        sort_key=args.sort_key
     )
 
 if __name__ == "__main__":
