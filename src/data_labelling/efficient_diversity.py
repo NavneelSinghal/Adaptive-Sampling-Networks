@@ -58,7 +58,7 @@ def init_worker(num_gpus_available: int):
     print(f"{process_name}: Model loaded on cuda:{gpu_id}.")
 
 
-def process_group(datapoints: List[Dict], reference_seed: int) -> str | None:
+def process_group(datapoints: List[Dict]) -> str | None:
     global embedding_model
     if len(datapoints) < 2:
         return None
@@ -73,7 +73,7 @@ def process_group(datapoints: List[Dict], reference_seed: int) -> str | None:
         }
     return '\n'.join([json.dumps(dp) for dp in datapoints])
 
-def label_diversity_parallel(data_path: str, output_path: str, reference_seed: int, num_gpus: int):
+def label_diversity_parallel(data_path: str, output_path: str, num_gpus: int):
     print(f"Reading and grouping data from {data_path}...")
     data_groups = defaultdict(lambda: defaultdict(list))
     with open(data_path, 'r', encoding='utf-8') as f:
@@ -87,7 +87,7 @@ def label_diversity_parallel(data_path: str, output_path: str, reference_seed: i
     print(f"\nFound {len(jobs)} groups to process.")
     print(f"Starting parallel processing with {num_processes} workers across {num_gpus} GPUs.")
     
-    worker_func = partial(process_group, reference_seed=reference_seed)
+    worker_func = partial(process_group)
 
     with open(output_path, 'w', encoding='utf-8') as f_out:
         with multiprocessing.Pool(
@@ -106,9 +106,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Efficiently label generation diversity from a multi-seed dataset.")
     parser.add_argument("--data_path", type=str, required=True, help="Path to the multi-seed .jsonl dataset.")
     parser.add_argument("--output_path", type=str, required=True, help="Path to save the annotated output .jsonl file.")
-    parser.add_argument("--reference_seed", type=int, default=0, help="The seed of the datapoint to append scores to.")
     parser.add_argument("--num_gpus", type=int, default=2, help="Number of GPUs to distribute work across.")
     args = parser.parse_args()
 
     multiprocessing.set_start_method("spawn", force=True)
-    label_diversity_parallel(args.data_path, args.output_path, args.reference_seed, args.num_gpus)
+    label_diversity_parallel(args.data_path, args.output_path, args.num_gpus)

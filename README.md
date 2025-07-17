@@ -32,21 +32,22 @@ Instead of a simple data generation script, the repository uses a parallelized p
 
 1.  A high-throughput `SGLang` server is launched to serve the base LLM. Multiple servers can be run in parallel for even greater throughput.
 2.  The `src/rejection_sampling/generate_candidates_multi.py` script reads prompts from various source datasets (defined in `configs/data_generation/dataset_sources.yaml`).
-3.  For each prompt, it generates multiple responses, each using a different sampling heuristic from a broad configuration file (e.g., `configs/data_generation/generated_config_llama3.2_3b.yaml`).
+3.  For each prompt, it generates multiple responses, each using a different sampling heuristic from a broad, generated configuration file (e.g., `generated_config_llama3.2_3b.yaml`).
 4.  This process creates a rich dataset where each prompt is associated with dozens of generations, each tagged with the specific heuristic used.
 
-### 2\. Data Annotation & Labeling
+### 2. Data Annotation & Labeling
 
 Once candidates are generated, they are annotated with objective scores to identify the highest-quality outputs. This is a crucial step for creating the "target" data for the sampler model.
 
 1.  **Quality Ranking**: The `src/data_labelling/label_ratings.py` script uses a reward model (e.g., `GRAM-LLaMA3.2-3B-RewardModel`) to conduct a Swiss-style tournament for the generations associated with each prompt. It then uses a Bradley-Terry model to calculate a latent quality rating for each generation. This effectively ranks the different sampling heuristics for a given prompt.
 2.  **Diversity Scoring**: `src/data_labelling/efficient_diversity.py` calculates `self-BLEU` and `embedding_entropy` scores to measure the diversity of generations produced by each heuristic.
-3.  **Data Matching**: `src/data_labelling/label_infinigram.py` uses the Infini-gram API to check for n-gram overlap with a large reference corpus, to match the quality of generations with
-    that of high-quality datasets.
+3.  **Data Matching**: `src/data_labelling/label_infinigram.py` uses the Infini-gram API to check for n-gram overlap with a large reference corpus.
+4.  **Verifiable rewards:** `src/data_labelling/label_verifier_rewards.py` uses verifiers to score relevant prompts for correctness based on verifiable criteria, like instruction following and math.
+5.  **Final Scoring**: `src/data_labelling/process_and_score.py` normalizes all scores (quality, diversity, etc.), computes a final weighted score, and filters the dataset to keep only the top-performing generations for training.
 
-### 3\. Supervised Training
+### 3. Supervised Training
 
-With the annotated dataset, the `train_supervised.py` script trains the sampler model. The data can be filtered to only include generations from the top-ranked heuristics.
+With the final annotated and filtered dataset, the `train_supervised.py` script trains the sampler model.
 
 1.  For each sample in the dataset, the script replays the generation to get the base model's raw logits at each step.
 2.  It then applies the saved heuristic pipeline to these raw logits to compute the "target" logits. The target logits are typically sparse, with many values set to `-inf` where tokens have been filtered out.
@@ -82,86 +83,146 @@ There are three different sampler architectures of increasing complexity defined
 ```
 .
 ├── src/
-│   ├── _sglang/                          # SGLang server integration and custom processors.
-│   │   ├── generate_rollouts_parallel.py # Client for parallel generation.
-│   │   └── run_sglang_server*.sh         # Scripts to launch SGLang servers.
-│   ├── rejection_sampling/               # Advanced candidate generation pipeline.
-│   │   ├── generate_candidates_multi.py  # Main script for generating candidates in parallel.
-│   │   └── run_on_multiple_servers.sh    # Script to launch multiple servers across GPUs.
-│   ├── data_labelling/                   # Scripts for annotating generated data.
-│   │   ├── label_ratings.py              # Ranks generations using a reward model tournament.
-│   │   ├── efficient_diversity.py        # Labels for self-BLEU and embedding entropy.
-│   │   └── label_infinigram.py           # Labels for data-matching using Infini-gram API.
-│   ├── analyze.py                        # Script to analyze and compare a trained sampler.
-│   ├── generate_data.py                  # (Legacy) Simple script to generate training data.
-│   ├── train_supervised.py               # Main training script for the sampler models.
-│   ├── models.py                         # Definitions for the sampler model architectures.
-│   ├── loss.py                           # The custom TruncatedLogitsLoss.
-│   └── sampling_heuristics.py            # Utilities to build and apply sampling pipelines.
+│   ├── _sglang/                         # Low-level SGLang server integration and custom processors.
+│   │   ├── sglang_pipeline_processor.py # CustomLogitProcessor for using samplers in SGLang.
+│   │   └── run_sglang_server*.sh        # Scripts to launch SGLang servers.
+│   ├── rejection_sampling/              # High-level data generation pipeline.
+│   │   ├── generate_candidates_multi.py # Main script for generating candidates using multiple servers.
+│   │   └── run_on_multiple_servers.sh   # Utility script to launch multiple SGLang servers across GPUs.
+│   ├── data_labelling/                  # Scripts for annotating generated data with scores.
+│   │   ├── label_ratings.py             # Ranks generations using a reward model tournament.
+│   │   ├── efficient_diversity.py       # Labels for self-BLEU and embedding entropy.
+│   │   ├── label_infinigram.py          # Labels for data-matching using Infini-gram API.
+│   │   ├── label_verifier_rewards.py    # Labels generations with correctness scores.
+│   │   └── process_and_score.py         # Normalizes scores and filters for the best generations.
+│   ├── analyze.py                       # Script to analyze and compare a trained sampler.
+│   ├── generate_data_deprecated.py      # (Legacy) Simple script to generate training data. Do not use.
+│   ├── train_supervised.py              # Main training script for the sampler models.
+│   ├── verify_datagen_and_transform.py  # Verifies integrity of generated data.
+│   ├── models.py                        # Definitions for the sampler model architectures.
+│   ├── loss.py                          # The custom TruncatedLogitsLoss.
+│   └── sampling_heuristics.py           # Utilities to build and apply sampling pipelines.
 ├── configs/
-│   ├── data_generation/                  # Configs defining heuristics and data sources.
-│   ├── reward_model/                     # Configs for the reward model-based tournament.
-│   └── sampler_models/                   # Configs for the sampler models' architectures.
+│   ├── data_generation/                 # Configs defining heuristics and data sources.
+│   ├── reward_model/                    # Configs for the reward model-based tournament.
+│   └── sampler_models/                  # Configs for the sampler models' architectures.
 └── requirements.txt
 ```
 
 ## Usage
 
-The process involves generating candidates, labeling them for quality, and then training a sampler model on the best-resulting data.
+The complete process involves generating candidate data across multiple seeds, verifying it, annotating it with various quality metrics, filtering it down to the best samples, and finally training a sampler model.
 
-### Workflow 1: Advanced Data Generation & Labeling
+### Workflow 1: Data Curation Pipeline
 
 This workflow creates the high-quality dataset needed for training.
 
-**Step 1: Launch SGLang Server(s)**
+**Step 0: Generate Heuristics Configuration**
 
-First, launch one or more SGLang servers to serve the base LLM. You can launch one server per GPU for maximum throughput. Modify the `model-path` in the script. Note that something similar can be
-achieved via `sglang_router` as well.
+The large set of sampling heuristics is defined in a YAML file, which you must generate first. Choose a script based on the model you intend to use.
 
 ```bash
-# To launch 8 servers, one for each GPU from 0 to 7
+# Example for Llama 3.2 3B
+python configs/data_generation/generate_yaml_llama3.2_3b.py
+````
+
+This will create `generated_config_llama3.2_3b.yaml` in the same directory.
+
+**Step 1: Launch SGLang Server(s)**
+
+Launch one or more SGLang servers to serve the base LLM. The `src/rejection_sampling/run_on_multiple_servers.sh` script is a template for launching one server per GPU. You must edit it to replace `/path/to/model` with the actual path to your base LLM.
+
+```bash
+# Example: Launch 8 servers, one for each GPU from 0 to 7
+# (after editing the script with your model path)
 bash src/rejection_sampling/run_on_multiple_servers.sh
 ```
 
-**Step 2: Generate Candidate Responses**
+**Step 2: Generate Candidate Responses (Multi-Seed)**
 
-In a separate terminal, run the candidate generation script. This will connect to the running SGLang servers and generate responses for every prompt using every heuristic specified.
-
-  * `dataset_sources_config_path`: A YAML file listing the input prompt datasets (see `configs/data_generation/dataset_sources.yaml`).
-  * `heuristics_config_path`: A YAML file listing all sampling pipelines to use (see `configs/data_generation/generate_yaml_*.py` for examples).
+Run the candidate generation script. To gather data for diversity metrics, you must run this script multiple times, changing the `--output_path` and `--seed` for each run.
 
 ```bash
+# Example for seed 0
 python src/rejection_sampling/generate_candidates_multi.py \
-    --model_path "path/to/your/model" \
+    --model_path "/path/to/your/model" \
     --dataset_sources_config_path "configs/data_generation/dataset_sources.yaml" \
     --heuristics_config_path "configs/data_generation/generated_config_llama3.2_3b.yaml" \
-    --output_path "./candidate_generations.jsonl" \
+    --output_path "./candidate_generations_seed0.jsonl" \
+    --seed 0 \
     --num_servers 8 \
-    --max_workers 32 \
-    --max_new_tokens 250
+    --max_workers 64
+
+# Example for seed 1
+python src/rejection_sampling/generate_candidates_multi.py \
+    --model_path "/path/to/your/model" \
+    --dataset_sources_config_path "configs/data_generation/dataset_sources.yaml" \
+    --heuristics_config_path "configs/data_generation/generated_config_llama3.2_3b.yaml" \
+    --output_path "./candidate_generations_seed1.jsonl" \
+    --seed 1 \
+    --num_servers 8 \
+    --max_workers 64
+
+# ... repeat for all seeds ...
 ```
 
-**Step 3: Label Data for Quality (Tournament)**
+**Step 3: Consolidate and Verify Data**
 
-Run the tournament script to score the generated candidates using a reward model. This adds a `bradley_terry_rating` to each datapoint.
-
-  * `--config`: Path to the tournament configuration YAML, which specifies the data paths and reward model details (see `configs/reward_model/tournament_config.yaml`).
+Combine all the generated files and run the verification script to ensure data integrity.
 
 ```bash
+# 1. Combine all generated files
+cat candidate_generations_seed*.jsonl > all_generations.jsonl
+
+# 2. Verify the combined file
+python src/verify_datagen_and_transform.py \
+    --input-path ./all_generations.jsonl \
+    --output-path ./all_generations_verified.jsonl \
+    --heuristics-config-path "configs/data_generation/generated_config_llama3.2_3b.yaml" \
+    --expected-seeds 8 # Set this to the number of seeds you ran
+```
+
+**Step 4: Annotate Data**
+
+Run the various labeling scripts on the verified data. These can be run in any order. Each script reads an input file and writes a new one with added annotations.
+
+```bash
+# 1. Label for Quality (Reward Model Tournament)
 python src/data_labelling/label_ratings.py \
-    --config configs/reward_model/tournament_config.yaml
+    --config configs/reward_model/tournament_config.yaml # Edit this file to point to all_generations_verified.jsonl
+
+# Let's assume the output is quality_labelled.jsonl
+
+# 2. Label for Diversity
+python src/data_labelling/efficient_diversity.py \
+    --data_path ./quality_labelled.jsonl \
+    --output_path ./quality_diversity_labelled.jsonl \
+    --num_gpus 2
+
+# ... Similarly, run other labellers like label_verifier_rewards.py and (optional) label_infinigram.py ...
+```
+
+**Step 5: Final Scoring and Filtering**
+
+Use the `process_and_score.py` script to normalize all collected scores and filter the dataset, keeping only the best generations for training.
+
+```bash
+python src/data_labelling/process_and_score.py \
+    --input-path ./quality_diversity_labelled.jsonl \
+    --output-path ./final_training_data.jsonl \
+    --top-k 1
 ```
 
 ### Workflow 2: Train the Sampler Model
 
-After generating and labeling data, you can train your sampler model. You may want to first filter your labeled `.jsonl` file to only include generations with high `bradley_terry_rating`.
+After creating `final_training_data.jsonl`, you can train your sampler model.
 
 ```bash
 python src/train_supervised.py \
-  --model_name_or_path "path/to/your/model" \
+  --model_name_or_path "/path/to/your/model" \
   --sampler_model_name "SamplingNetwork" \
   --sampler_config_path "configs/sampler_models/model_config_scale.yaml" \
-  --data_path "./path/to/your/filtered_labelled_data.jsonl" \
+  --data_path "./final_training_data.jsonl" \
   --output_dir "./sampler_checkpoints" \
   --max_seq_length 1000 \
   --token_batch_size 12 \
@@ -182,7 +243,7 @@ Use `analyze.py` to compare your trained sampler's output distribution against t
 
 ```bash
 python src/analyze.py \
-  --model_name_or_path "path/to/your/model" \
+  --model_name_or_path "/path/to/your/model" \
   --sampler_model_name "SamplingNetwork" \
   --sampler_config_path "configs/sampler_models/model_config.yaml" \
   --sampler_checkpoint_path "./sampler_checkpoints/final_model/sampler_model.bin" \

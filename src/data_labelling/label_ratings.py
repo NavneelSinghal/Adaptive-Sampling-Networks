@@ -122,7 +122,6 @@ def process_job(args: tuple[tuple[str, int, List[Dict]], Dict]):
     """
     (prompt, seed, datapoints), config = args
     
-    # Pass the model_name_or_path to the scorer so it can initialize a tokenizer.
     scorer = get_scorer(
         backend=config['reward_model_backend'],
         url=config.get("sglang_url"),
@@ -132,7 +131,7 @@ def process_job(args: tuple[tuple[str, int, List[Dict]], Dict]):
     if len(datapoints) < 2:
         return datapoints
         
-    generation_map = {f"{dp[config['heuristic_key']]}_{dp['seed']}": dp[config['generation_key']] for dp in datapoints}
+    generation_map = {f"{json.dumps(dp[config['heuristic_key']], sort_keys=True)}_{dp['seed']}": dp[config['generation_key']] for dp in datapoints}
     player_ids = list(generation_map.keys())
     
     num_rounds = math.ceil(math.log2(len(player_ids))) + config.get('tournament_extra_rounds', 2)
@@ -145,7 +144,7 @@ def process_job(args: tuple[tuple[str, int, List[Dict]], Dict]):
     final_ratings = ranker.calculate_ratings()
     
     for dp in datapoints:
-        player_id = f"{dp[config['heuristic_key']]}_{dp['seed']}"
+        player_id = f"{json.dumps(dp[config['heuristic_key']], sort_keys=True)}_{dp['seed']}"
         if player_id in final_ratings:
             dp['bradley_terry_rating'] = final_ratings[player_id]
             
