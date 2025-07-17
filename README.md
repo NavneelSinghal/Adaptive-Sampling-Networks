@@ -124,7 +124,7 @@ The large set of sampling heuristics is defined in a YAML file, which you must g
 ```bash
 # Example for Llama 3.2 3B
 python configs/data_generation/generate_yaml_llama3.2_3b.py
-````
+```
 
 This will create `generated_config_llama3.2_3b.yaml` in the same directory.
 
