@@ -104,7 +104,7 @@ export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(($NUM_GPUS - 1)))
 LOG_FILE="${OUTPUT_DIR}/sglang_router_reward.log"
 python -m sglang_router.launch_server \
     --model-path "${REWARD_MODEL_PATH}" --host "0.0.0.0" --port 30000 \
-    --dp-size $(NUM_GPUS) \
+    --dp-size ${NUM_GPUS} \
     --mem-fraction-static 0.9 --dtype bfloat16 \
     --random-seed "${LABELING_SEED}" &> "${LOG_FILE}" &
 echo "Waiting 60 seconds for reward router to initialize..."
