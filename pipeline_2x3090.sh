@@ -79,7 +79,7 @@ do
         --num_servers 1 \
         --base_port 30000 \
         --max_workers "${GENERATION_WORKERS}" \
-        --max_new_tokens 512
+        --max_new_tokens 2048
     echo "  > Shutting down SGLang Router for seed ${seed}..."
     pkill -P $$ || true
     wait || true

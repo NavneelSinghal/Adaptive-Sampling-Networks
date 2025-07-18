@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def calculate_self_bleu(generations: List[str]) -> float:
+def calculate_self_bleu(generations: List[str], log_transform: bool = True) -> float:
     from sacrebleu.metrics import BLEU
     if len(generations) < 2:
         return 0.0
@@ -21,9 +21,12 @@ def calculate_self_bleu(generations: List[str]) -> float:
         references = generations[:i] + generations[i+1:]
         score = bleu.sentence_score(hypothesis, references)
         total_bleu_score += score.score
-    return total_bleu_score / len(generations)
+    score = total_bleu_score / len(generations)
+    if log_transform:
+        score = float(np.log(max(score, 1e-9)))
+    return score
 
-def calculate_embedding_entropy(generations: List[str], model) -> float:
+def calculate_embedding_entropy(generations: List[str], model, log_transform: bool = True) -> float:
     from sklearn.metrics.pairwise import cosine_similarity
     if not generations:
         return 0.0
@@ -37,7 +40,9 @@ def calculate_embedding_entropy(generations: List[str], model) -> float:
     normalized_eigenvalues = normalized_eigenvalues[normalized_eigenvalues > 1e-9]
     if normalized_eigenvalues.size == 0:
         return 0.0
-    entropy = -np.sum(normalized_eigenvalues * np.log2(normalized_eigenvalues))
+    entropy = float(-np.sum(normalized_eigenvalues * np.log2(normalized_eigenvalues)))
+    if log_transform:
+        entropy = float(np.log(max(1e-9, entropy)))
     return entropy
 
 embedding_model = None
