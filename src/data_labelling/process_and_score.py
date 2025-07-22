@@ -13,6 +13,7 @@ def process_and_score_data(
     c_coeffs: list[float],
     top_k: int,
     sort_key: str,
+    ignore_verifiable_filtering: bool,
 ):
     print("Reading data and grouping by prompt")
     data_by_prompt_seed = defaultdict(list)
@@ -50,7 +51,8 @@ def process_and_score_data(
         processed_generations = []
         is_verifiable_task = any(dp.get('verifiable_reward') is not None for dp in generations)
         if is_verifiable_task:
-            generations = [dp for dp in generations if dp.get('verifiable_reward') == 1.0]
+            if not ignore_verifiable_filtering:
+                generations = [dp for dp in generations if dp.get('verifiable_reward') == 1.0]
             if not generations:
                 print(f'WARNING: All generations failed for prompt {group_key[0][:50]}... skipping.')
                 continue
@@ -80,6 +82,7 @@ def process_and_score_data(
             processed_generations.append(dp)
         if not processed_generations:
             continue
+        # default_sort_key = f"a0.1_b0.9_c0.9"
         processed_generations.sort(
             key=lambda x: x['combined_scores'].get(sort_key, -999),
             reverse=True
@@ -101,6 +104,7 @@ def main():
     parser.add_argument("--output-path", type=str, required=True, help="Path to save the final processed and filtered .jsonl file.")
     parser.add_argument("--top-k", type=int, default=5, help="Keep the top K best-scoring generations for each prompt.")
     parser.add_argument("--sort-key", type=str, default='a0.1_b0.9_c0.9', help="Key for ranking: ax_by_cz where x = weight for diversity, y = weight for quality, z = weight for correctness")
+    parser.add_argument("--ignore-verifiable-filtering", action="store_true", help="Whether we should do filtering for verifiable rewards or not")
     
     args = parser.parse_args()
     
@@ -115,7 +119,8 @@ def main():
         b_coeffs=B_COEFFS,
         c_coeffs=C_COEFFS,
         top_k=args.top_k,
-        sort_key=args.sort_key
+        sort_key=args.sort_key,
+        ignore_verifiable_filtering=args.ignore_verifiable_filtering,
     )
 
 if __name__ == "__main__":
