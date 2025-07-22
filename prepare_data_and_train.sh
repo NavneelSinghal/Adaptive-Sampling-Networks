@@ -26,8 +26,6 @@ echo "STAGE 1: Generating Datasets"
 
 mkdir -p ${DATA_BASE_PATH}
 
-echo
-
 for key_coeffs in "${KEYS_TO_PROCESS[@]}"; do
     for k in "${TOP_K_VALUES[@]}"; do
         # Read the space-separated coefficients into individual variables
@@ -48,9 +46,7 @@ for key_coeffs in "${KEYS_TO_PROCESS[@]}"; do
     done
 done
 
-echo
 echo ">> All ${TOTAL_DATASETS} datasets generated successfully."
-echo
 
 echo "STAGE 2: Launching Training Runs"
 
@@ -59,7 +55,6 @@ echo ">> Creating base directories for models and logs..."
 mkdir -p ${MODEL_DIR}
 mkdir -p ${TRAINING_LOGS_DIR}
 echo ">> Directories created."
-echo
 
 JOB_COUNT=0
 TOTAL_JOBS_LAUNCHED=0
