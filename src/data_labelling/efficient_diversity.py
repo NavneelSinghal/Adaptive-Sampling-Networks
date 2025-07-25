@@ -62,6 +62,23 @@ def init_worker(num_gpus_available: int):
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device=f'cuda:{gpu_id}')
     print(f"{process_name}: Model loaded on cuda:{gpu_id}.")
 
+def init_worker_list_gpus(gpus_available: List[int]):
+    """
+    Initializer for each worker. Uses the worker's unique ID to select a GPU.
+    This ensures the model is loaded only once per process on the correct device.
+    """
+    global embedding_model
+    from sentence_transformers import SentenceTransformer
+    
+    worker_id = multiprocessing.current_process()._identity[0] - 1
+    gpu_id = worker_id % len(gpus_available)
+    device = gpus_available[gpu_id]
+    process_name = multiprocessing.current_process().name
+    print(f"{process_name}: Initializing model on {device}...")
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
+    print(f"{process_name}: Model loaded on {device}.")
+
+
 
 def process_group(datapoints: List[Dict]) -> str | None:
     global embedding_model

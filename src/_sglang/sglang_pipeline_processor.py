@@ -2,6 +2,9 @@ import torch
 import yaml
 from sglang.srt.sampling.custom_logit_processor import CustomLogitProcessor
 from src.models import SamplingNetwork, LocalProbabilityTransform, SimpleDistributionAwareTransform
+from cachetools import LRUCache
+from collections import OrderedDict
+import gc
 from transformers.generation.logits_process import (
     TopKLogitsWarper,
     TopPLogitsWarper,
@@ -12,7 +15,17 @@ from transformers.generation.logits_process import (
     EtaLogitsWarper,
 )
 
-_GLOBAL_SAMPLER_CACHE = {}
+class ModelLRUCache(LRUCache):
+    def popitem(self):
+        key, value = super().popitem()
+        del value
+        gc.collect()
+        torch.cuda.empty_cache()
+        return key, value
+
+_SAMPLER_CACHE_SIZE = 16
+_GLOBAL_SAMPLER_CACHE = ModelLRUCache(maxsize=_SAMPLER_CACHE_SIZE)
+
 PROCESSOR_MAP = {
     "top_k": TopKLogitsWarper,
     "top_p": TopPLogitsWarper,
