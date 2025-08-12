@@ -170,7 +170,7 @@ def compute_rewards(source_data, completions, rl_config, tokenizer, args):
             is_applicable['diversity'][i] = 1.0
 
     reward_model_urls = [f"http://{args.reward_model_host}:{args.reward_model_port + i}/classify" for i in range(args.reward_model_gpus)]
-    quality_rewards = compute_unnormalized_direct_ratings((reward_data, args.reward_model_path, reward_model_urls, tokenizer, 0))
+    quality_rewards = compute_unnormalized_direct_ratings(reward_data, args.reward_model_path, reward_model_urls, tokenizer, 0)
     for i, item in enumerate(quality_rewards):
          if 'bradley_terry_rating' in item:
             rewards['quality'][i] = item['bradley_terry_rating']
