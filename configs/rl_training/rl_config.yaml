@@ -1,0 +1,26 @@
+G: 16
+G_div: 4
+prompts_per_batch: 8
+max_new_tokens: 1024
+
+reward_weights:
+  quality: 0.9
+  diversity: 0.1
+  verifiable: 0.9
+
+reward_normalization:
+  quality:
+    mean: 0.0
+    std: 1.0
+  diversity:
+    mean: 0.0
+    std: 1.0
+  verifiable:
+    mean: 0.0
+    std: 1.0
+
+lr: 1.0e-5
+lr_scheduler_type: "cosine"
+num_warmup_steps: 100
+beta: 0.1
+max_grad_norm: 1.0
